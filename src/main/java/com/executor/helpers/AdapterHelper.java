@@ -1,8 +1,8 @@
-package com.bucketadapter.helpers;
+package com.executor.helpers;
 
-import com.bucketadapter.bucketadapterexceptions.BucketObjectNotFoundException;
-import com.bucketadapter.bucketadapterexceptions.BucketOperationException;
-import com.bucketadapter.bucketadapterexceptions.InvalidBucketPathException;
+import com.executor.bucketadapterexceptions.BucketObjectNotFoundException;
+import com.executor.bucketadapterexceptions.BucketOperationException;
+import com.executor.bucketadapterexceptions.InvalidBucketPathException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Set;

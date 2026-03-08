@@ -1,9 +1,9 @@
 package com.bucketadapter.bucket_adapter;
 
-import com.bucketadapter.adapter.impl.AWSBucketAdapterImpl;
-import com.bucketadapter.bucketadapterexceptions.BucketObjectNotFoundException;
-import com.bucketadapter.bucketadapterexceptions.BucketOperationException;
-import com.bucketadapter.bucketadapterexceptions.InvalidBucketPathException;
+import com.executor.adapter.impl.AWSBucketAdapterImpl;
+import com.executor.bucketadapterexceptions.BucketObjectNotFoundException;
+import com.executor.bucketadapterexceptions.BucketOperationException;
+import com.executor.bucketadapterexceptions.InvalidBucketPathException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;

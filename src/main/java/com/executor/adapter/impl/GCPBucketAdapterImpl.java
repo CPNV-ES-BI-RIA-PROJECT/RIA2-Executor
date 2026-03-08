@@ -1,10 +1,10 @@
-package com.bucketadapter.adapter.impl;
+package com.executor.adapter.impl;
 
-import com.bucketadapter.adapter.BucketAdapter;
-import com.bucketadapter.bucketadapterexceptions.BucketObjectNotFoundException;
-import com.bucketadapter.bucketadapterexceptions.BucketOperationException;
-import com.bucketadapter.bucketadapterexceptions.InvalidBucketPathException;
-import com.bucketadapter.helpers.AdapterHelper;
+import com.executor.adapter.BucketAdapter;
+import com.executor.bucketadapterexceptions.BucketObjectNotFoundException;
+import com.executor.bucketadapterexceptions.BucketOperationException;
+import com.executor.bucketadapterexceptions.InvalidBucketPathException;
+import com.executor.helpers.AdapterHelper;
 import com.google.api.gax.paging.Page;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;

@@ -15,10 +15,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.bucketadapter.adapter.impl.GCPBucketAdapterImpl;
-import com.bucketadapter.bucketadapterexceptions.BucketObjectNotFoundException;
-import com.bucketadapter.bucketadapterexceptions.BucketOperationException;
-import com.bucketadapter.bucketadapterexceptions.InvalidBucketPathException;
+import com.executor.adapter.impl.GCPBucketAdapterImpl;
+import com.executor.bucketadapterexceptions.BucketObjectNotFoundException;
+import com.executor.bucketadapterexceptions.BucketOperationException;
+import com.executor.bucketadapterexceptions.InvalidBucketPathException;
 import com.google.api.gax.paging.Page;
 import com.google.cloud.ReadChannel;
 import com.google.cloud.storage.Blob;

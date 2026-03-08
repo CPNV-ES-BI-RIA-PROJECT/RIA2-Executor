@@ -1,6 +1,6 @@
-package com.bucketadapter;
+package com.executor;
 
-import com.bucketadapter.adapter.BucketAdapter;
+import com.executor.adapter.BucketAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 

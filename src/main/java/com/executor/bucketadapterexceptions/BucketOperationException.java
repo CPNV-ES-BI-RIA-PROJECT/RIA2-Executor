@@ -1,4 +1,4 @@
-package com.bucketadapter.bucketadapterexceptions;
+package com.executor.bucketadapterexceptions;
 
 public class BucketOperationException extends RuntimeException {
   public BucketOperationException(String message, Throwable cause) {

@@ -1,6 +1,6 @@
-package com.bucketadapter.adapter.impl;
+package com.executor.adapter.impl;
 
-import com.bucketadapter.adapter.BucketAdapter;
+import com.executor.adapter.BucketAdapter;
 
 import java.util.List;
 import org.springframework.stereotype.Component;

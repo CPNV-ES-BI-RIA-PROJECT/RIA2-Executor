@@ -1,4 +1,4 @@
-package com.bucketadapter.config;
+package com.executor.config;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.storage.Storage;

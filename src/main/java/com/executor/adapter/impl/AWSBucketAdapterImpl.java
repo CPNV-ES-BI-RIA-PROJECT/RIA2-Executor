@@ -1,9 +1,9 @@
-package com.bucketadapter.adapter.impl;
+package com.executor.adapter.impl;
 
-import com.bucketadapter.adapter.BucketAdapter;
-import com.bucketadapter.bucketadapterexceptions.BucketObjectNotFoundException;
-import com.bucketadapter.bucketadapterexceptions.BucketOperationException;
-import com.bucketadapter.bucketadapterexceptions.InvalidBucketPathException;
+import com.executor.adapter.BucketAdapter;
+import com.executor.bucketadapterexceptions.BucketObjectNotFoundException;
+import com.executor.bucketadapterexceptions.BucketOperationException;
+import com.executor.bucketadapterexceptions.InvalidBucketPathException;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -26,7 +26,7 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
-import com.bucketadapter.helpers.AdapterHelper;
+import com.executor.helpers.AdapterHelper;
 
 import java.time.Duration;
 import java.util.ArrayList;

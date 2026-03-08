@@ -1,4 +1,4 @@
-package com.bucketadapter;
+package com.executor;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;

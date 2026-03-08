@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    image: bucket-adapter:latest
+    image: executor:latest
     ports:
       - "${SEREVER_PORT:-8080}:${SEREVER_PORT:-8080}"
     env_file:

@@ -1,4 +1,4 @@
-package com.bucketadapter.config;
+package com.executor.config;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import org.slf4j.Logger;

@@ -1,4 +1,4 @@
-package com.bucketadapter.bucketadapterexceptions;
+package com.executor.bucketadapterexceptions;
 
 import jakarta.servlet.http.HttpServletRequest;
 
