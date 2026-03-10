@@ -1,5 +1,5 @@
 services:
-  MariaDB:
+  mariadb:
     image: mariadb:${MARIADB_VERSION}
     container_name: executor-mariadb
     restart: unless-stopped
