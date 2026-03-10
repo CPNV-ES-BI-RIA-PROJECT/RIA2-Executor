@@ -1,5 +1,7 @@
 package com.executor;
 
+import com.executor.dto.DownloadScriptResponse;
+import com.executor.services.LocalScriptStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -21,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import java.nio.file.Path;
 import java.util.List;
 
 @RestController
@@ -32,9 +35,11 @@ public class BucketController {
       justification =
           "BucketService is injected by Spring (bean); the controller does not expose it.")
   private final BucketService bucketService;
+  private final LocalScriptStorageService localScriptStorageService;
 
-  public BucketController(BucketService bucketService) {
+  public BucketController(BucketService bucketService, LocalScriptStorageService localScriptStorageService) {
     this.bucketService = bucketService;
+    this.localScriptStorageService = localScriptStorageService;
   }
 
   @Operation(
@@ -113,16 +118,17 @@ public class BucketController {
     @ApiResponse(responseCode = "500", description = "Internal error")
   })
   @GetMapping(value = "/download", params = "remote")
-  public ResponseEntity<byte[]> download(@RequestParam String remote) {
+  public ResponseEntity<DownloadScriptResponse> download(@RequestParam String remote) throws IOException {
     byte[] data = bucketService.download(remote);
 
-    String filename = remote.substring(remote.lastIndexOf('/') + 1);
+    Path savedPath = localScriptStorageService.save(remote, data);
 
-    return ResponseEntity.ok()
-        .contentType(MediaType.APPLICATION_OCTET_STREAM)
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            "attachment; filename=\"" + filename.replace("\"", "") + "\"")
-        .body(data);
+    DownloadScriptResponse response = new DownloadScriptResponse(
+            remote,
+            savedPath.getFileName().toString(),
+            savedPath.toString()
+    );
+
+    return ResponseEntity.ok(response);
   }
 }
