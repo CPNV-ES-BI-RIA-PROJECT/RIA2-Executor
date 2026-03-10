@@ -1,4 +1,22 @@
 services:
+  mariadb:
+    image: mariadb:${MARIADB_VERSION}
+    container_name: executor-mariadb
+    restart: unless-stopped
+    ports:
+      - "${MARIADB_PORT}:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
   app:
     build: .
     image: executor:latest
@@ -8,6 +26,9 @@ services:
       - .env
     volumes:
       - ./bi1-julien.json:/app/bi1-julien.json:ro
+      - ./data:/app/data
     environment:
       GOOGLE_APPLICATION_CREDENTIALS: /app/bi1-julien.json
       SEREVER_PORT: ${SEREVER_PORT:-8080}
+volumes:
+  mariadb_data:

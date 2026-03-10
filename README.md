@@ -1,326 +1,236 @@
-# Bucket Adapter
+# RIA2 Executor
 
-## Description
+## Overview
 
-Bucket Adapter is a REST microservice built with Spring Boot. Its goal is to communicate with multiple cloud providers  
-through a common interface and a Factory-based adapter selection.
+This project is a Spring Boot service that combines two responsibilities:
 
-The application exposes a REST API. The current AWS and GCP implementations support:
+1. Object storage access through a provider adapter (`AWS` or `GCP` today).
+2. SQL script execution against MariaDB after the script has been downloaded locally.
 
-- uploading objects (file content)
-- downloading objects
-- updating existing objects (overwrite)
-- deleting objects (single object or recursive prefix deletion)
-- listing bucket contents (objects and prefixes)
-- generating temporary shareable URLs (pre-signed URLs)
+The current codebase is not just a bucket adapter anymore. The main workflow implemented in the code is:
 
-## Getting Started
+1. Retrieve a `.sql` file from a cloud bucket.
+2. Save the downloaded file under `data/script/`.
+3. Execute that local SQL file against the configured MariaDB datasource.
 
-### Documentation
+Base path: `/api`  
+API version prefix: `/v1`
 
-You must run the application (see Deployment section) in order to access the documentation.
-The application runs under the `/api` context path (`server.servlet.context-path=/api`) and uses the
-port configured by `SEREVER_PORT`.
+Swagger UI: `http://localhost:<port>/api/swagger-ui/index.html`
 
-Examples:
 
-- Local run with the sample `.env` (`SEREVER_PORT=8090`): `http://localhost:8090/api/swagger-ui/index.html`
-- Docker run without overriding the port (compose default): `http://localhost:8080/api/swagger-ui/index.html`
+## Tech Stack
 
-Video of kanban :
-https://youtu.be/awYhGX692GE
+- Java 21
+- Spring Boot 4
+- Spring Web MVC
+- Spring JDBC
+- MariaDB JDBC driver
+- AWS SDK v2 for S3
+- Google Cloud Storage SDK
+- Springdoc OpenAPI
+- JUnit 5
+- Mockito
+- Docker / Docker Compose
 
-### Prerequisites
+## Configuration
 
-The following tools and dependencies are required:
-
-* IDE used IntelliJ `2025.3.1`
-
-* **Language / Runtime**
-    * Java JDK 21 `openjdk 21.0.9 2025-10-21`
-    * OpenJDK Runtime Environment `(build 21.0.9)`
-    * JVM compatible with Java 21
-
-* **Frameworks & Libraries**
-    * Main frameworks/libraries used by the project (see `pom.xml` for the exact versions)
-    * Spring Boot
-    * Spring Framework
-    * AWS SDK v2 (S3, Presigner)
-    * Google Cloud Storage SDK
-    * JUnit 5
-    * Mockito
-
-* **Build & Dependency Management**
-    * Maven (`mvn`) or Maven Wrapper (`./mvnw`, recommended for reproducible builds)
-
-* **Supported OS (tested)**
-    * MacOS (`Tahoe 26.1`)
-
-* **Cloud Providers**
-    * AWS S3 (currently implemented)
-    * Google Cloud Storage (implemented)
-    * Azure Blob Storage (planned)
-
-* **Virtualization**
-    * Docker version 28.5.1, build e180ab8
-
----  
-
-### Configuration
-
-#### Environment variables / system properties
-
-The application relies on external configuration to select the storage provider and access the bucket.
-
-1. Copy the `.env.exemple` file to a `.env` file using this command : `cp .env.exemple .env`.
-2. Configure variables in `.env` file.
-
-Default application port (override if needed):
+Copy the example file first:
 
 ```bash
-# Note: the project currently uses SEREVER_PORT (typo kept in config/code)
+cp .env.exemple .env
+```
+
+The code currently relies on `.env` values being loaded into JVM system properties by `DotenvInitializer`. For local development, keep `.env` in the project root.
+
+### Required variables actually used by the code
+
+```bash
 SEREVER_PORT=8090
+PROVIDER_IMPL=AWS
+
+AWS_REGION=your-region
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/or/project-relative/path-to-credentials.json
+
+MARIADB_VERSION=11.4
+MARIADB_PORT=3306
+MARIADB_ROOT_PASSWORD=root
+MARIADB_DATABASE=executor
+MARIADB_USER=executor
+MARIADB_PASSWORD=executor_pwd
+
+spring.datasource.url=jdbc:mariadb://localhost:3306/executor
+spring.datasource.username=executor
+spring.datasource.password=executor_pwd
 ```
 
-#### AWS configuration
+### Important current behavior
 
-Required variables:
+- `PROVIDER_IMPL` selects the adapter used by `BucketAdapterFactory`.
+- Remote bucket paths are expected in the form `bucket/key.sql` or `gs://bucket/key.sql`.
+- Downloaded scripts are saved under `data/script/`.
+- The saved file name is sanitized, and `.sql` is appended automatically if missing.
+- `AwsClientConfig` and `GcpStorageConfig` currently read JVM system properties, so the current implementation expects `.env` loading semantics instead of plain environment-variable lookup.
+- `AZURE` exists as a bean name, but the implementation is empty.
 
-```bash  
-AWS_REGION=your-region  
-AWS_ACCESS_KEY_ID=your-access-key-id  
-AWS_SECRET_ACCESS_KEY=your-secret-access-key  
-```  
+## Database Initialization
 
-Provider selection:
+If this is the first time the database is run, create the `events` table before executing the sample insert script:
 
-```bash  
-PROVIDER_IMPL=AWS  
-```  
-
-#### GCP configuration
-
-Required variables :
-
-```bash  
-GOOGLE_CLOUD_PROJECT=your-project-id  
-GOOGLE_APPLICATION_CREDENTIALS=./path-to-credentials.json  
-```  
-
-> Note : You'll have to put the path of your `credentials.json` file in the `GOOGLE_APPLICATION_CREDENTIALS`
-> environment  
-> variable.
-
-Provider selection:
-
-```bash  
-PROVIDER_IMPL=GCP  
-```  
-
-#### Azure configuration
-
-For next feature.
-
-## Deployment
-
-### On dev environment
-
-#### Build the project
-
-This command runs the full Maven lifecycle used by the project (compile, tests, packaging,
-Checkstyle, and SpotBugs):
-
-```bash
-mvn clean install
+```sql
+CREATE TABLE events (
+    uid VARCHAR(255) NOT NULL PRIMARY KEY,
+    dtstamp DATETIME,
+    dtstart DATETIME,
+    dtend DATETIME,
+    summary TEXT,
+    description TEXT,
+    categories TEXT,
+    organizer VARCHAR(255),
+    attendee TEXT,
+    location TEXT,
+    timezone VARCHAR(64)
+);
 ```
 
-#### Run tests
+The sample file already present in the repository is:
+
+- `data/script/realdata.sql`
+
+It inserts one row into `events`.
+
+## Running the Project
+
+### Recommended local workflow
+
+The most reliable workflow with the current code is:
+
+1. Start MariaDB with Docker Compose.
+2. Run the Spring Boot app locally with Maven so `.env` is loaded by `DotenvInitializer`.
+
+Start only MariaDB:
 
 ```bash
-mvn test
+docker compose up -d mariadb
 ```
 
-2. Check code coverage (CLI)
+Run the application:
 
 ```bash
-mvn clean \
-  org.jacoco:jacoco-maven-plugin:0.8.12:prepare-agent \
-  test \
-  org.jacoco:jacoco-maven-plugin:0.8.12:report
+./mvnw spring-boot:run
 ```
 
-Generated report: `target/site/jacoco/index.html`
+Open Swagger:
 
-#### Run the application
-
-```bash
-mvn spring-boot:run
+```text
+http://localhost:8090/api/swagger-ui/index.html
 ```
 
-### On integration environment
+### Full Docker Compose
 
-#### Maven build
-
-```bash
-# Make sure Maven wrapper is executable
-chmod +x mvnw
-
-# Clean and compile, skip tests
-mvn clean package -DskipTests
-
-# (Optional) Run tests
-mvn test
-```
-
-#### Docker build & run
+The repository also contains an `app` service in `docker-compose.yml`:
 
 ```bash
-# Build Docker image
 docker compose up --build
 ```
 
-### How to use the application ?
+However, the current Java configuration loads provider credentials from JVM system properties populated by `.env`. If you run the app inside Docker, make sure those properties are still available to the JVM inside the container; otherwise AWS/GCP client initialization can fail.
 
-#### API
+## Build and Test
 
-##### Insomnia
-
-You can use Insomnia for commands. Import the Insomnia_2026-01-09.yaml file into your Insomnia application.
-The exported file contains sample values. For better reusability after import:
-
-- create an Insomnia environment with variables such as `base_url`, `remote`, and `expirationTime`
-- update requests to use those variables instead of hard-coded values
-- adapt the host/port to your local configuration (`SEREVER_PORT`)
-
-##### Curl
-
-To use the API you can read this [documentation](docs/curl-route.md).
-
-**How to update the API documentation ?**
-
-To update/export the OpenAPI documentation, first run the project using **Maven** or **Docker**:
+Build:
 
 ```bash
-# Maven
-mvn spring-boot:run
-
-# Docker
-docker compose up --build
+./mvnw clean install
 ```
 
-Then export the OpenAPI definition (JSON) from the running application:
+Run tests:
 
 ```bash
-curl "http://localhost:${SEREVER_PORT:-8090}/api/v3/api-docs" -o docs/openapi.json
+./mvnw test
 ```
 
-You can also open the interactive UI in your browser:
-`http://localhost:${SEREVER_PORT:-8090}/api/swagger-ui/index.html`
+## API Endpoints
 
-## Directory structure
+### Object storage endpoints
+
+Base: `/api/v1/objects`
+
+- `GET /api/v1/objects?remote=<bucket-or-prefix>&recursive=<true|false>`
+  Lists bucket contents.
+- `POST /api/v1/objects?remote=<bucket/key.sql>`
+  Uploads a file as `multipart/form-data` using the `file` part.
+- `DELETE /api/v1/objects?remote=<bucket/key-or-prefix>&recursive=<true|false>`
+  Deletes a file or a prefix.
+- `GET /api/v1/objects/share?remote=<bucket/key>&expirationTime=<seconds>`
+  Returns a temporary URL.
+- `GET /api/v1/objects/download?remote=<bucket/key.sql>`
+  Downloads the remote object and saves it locally. The response body is:
+
+```json
+{
+  "remote": "bucket/path/script.sql",
+  "filename": "script.sql",
+  "localPath": "data/script/script.sql"
+}
+```
+
+### SQL execution endpoint
+
+- `POST /api/v1/execute-script?localPath=<path-to-local-sql-file>`
+
+Example:
 
 ```bash
-.
-├── Dockerfile
-├── HELP.md
-├── Insomnia_2026-01-09.yaml
-├── README.md
-├── bi1-julien.json
-├── checkstyle.xml
-├── docker-compose.yml
-├── docs
-├── mvnw
-├── mvnw.cmd
-├── package-lock.json
-├── pom.xml
-├── qodana.yaml
-├──  src
-│    ├── main
-│    │   ├── java
-│    │   │   └── com
-│    │   │       └── bucketadapter
-│    │   │           ├── BucketAdapterApplication.java
-│    │   │           ├── BucketAdapterFactory.java
-│    │   │           ├── BucketController.java
-│    │   │           ├── BucketService.java
-│    │   │           ├── adapter
-│    │   │           │   ├── BucketAdapter.java
-│    │   │           │   └── impl
-│    │   │           │       ├── AWSBucketAdapterImpl.java
-│    │   │           │       ├── AZUREBucketAdapterImpl.java
-│    │   │           │       └── GCPBucketAdapterImpl.java
-│    │   │           ├── bucketadapterexceptions
-│    │   │           │   ├── ApiExceptionHandler.java
-│    │   │           │   ├── BucketObjectNotFoundException.java
-│    │   │           │   ├── BucketOperationException.java
-│    │   │           │   └── InvalidBucketPathException.java
-│    │   │           ├── config
-│    │   │           │   ├── AwsClientConfig.java
-│    │   │           │   ├── DotenvInitializer.java
-│    │   │           │   ├── GcpStorageConfig.java
-│    │   │           │   └── OpenApiConfig.java
-│    │   │           └── helpers
-│    │   │               └── AdapterHelper.java
-│    │   └── resources
-│    │       ├── application.properties
-│    │       ├── static
-│    │       └── templates
-│    └── test
-│        └── java
-│            └── com
-│                └── bucketadapter
-│                    └── bucket_adapter
-│                        ├── AWSBucketAdapterTest.java
-│                        └── GCPStorageAdapterTest.java
-└──  target
-
+curl -X POST "http://localhost:8090/api/v1/execute-script?localPath=data/script/realdata.sql"
 ```
 
-## Collaborate
+Current success response:
 
-### Proposing a new feature
+```text
+HTTP 200 with a plain-text success message
+```
 
-- Create an **issue** describing the feature or bug
-- Submit a **Pull Request** linked to the issue
+## Example End-to-End Usage
 
-### Commit convention
-
-This project follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
-
-Examples :
+### 1. Upload a SQL file to the selected bucket
 
 ```bash
-feat: add GCP bucket adapter
-fix: handle S3 presigner exception
-test: add unit tests for recursive delete
+curl -X POST "http://localhost:8090/api/v1/objects?remote=my-bucket/sql/realdata.sql" \
+  -F "file=@data/script/realdata.sql"
 ```
 
-### Git branch workflow
-
-This projects use the [Gitflow workflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow)
-
-Examples :
+### 2. Download it locally through the API
 
 ```bash
-feature/implement-aws-s3
-release/1.0.0
-hotfix/fix-servor-error-on-s3-upload
+curl "http://localhost:8090/api/v1/objects/download?remote=my-bucket/sql/realdata.sql"
 ```
 
-## License
+### 3. Execute the saved script
 
-This project is licensed under the **MIT License**.
+```bash
+curl -X POST "http://localhost:8090/api/v1/execute-script?localPath=data/script/realdata.sql"
+```
 
-See the `LICENSE` file for the full text.
+You can also execute any existing local SQL file directly, as long as the path is accessible by the running application.
 
-## Contact
+## Notes About the Current Codebase
 
-For questions or contributions:
+- The Maven artifact and some OpenAPI labels still use the old `bucket-adapter` naming.
+- The application name in `application.properties` is still `bucket-adapter`.
+- The README here reflects the actual code behavior, not the older project wording.
+- Tests currently cover the AWS and GCP adapter implementations only.
 
-- GitHub Issues
-- Pull Request discussions
+## Useful Files
 
-For personal interactions:
-
-- Schneider Julien
-- julienschneider@eduvaud.ch
+- `src/main/java/com/executor/controllers/BucketController.java`
+- `src/main/java/com/executor/controllers/SqlScriptExecutorController.java`
+- `src/main/java/com/executor/services/SqlExecutorService.java`
+- `src/main/java/com/executor/services/LocalScriptStorageService.java`
+- `src/main/resources/application.properties`
+- `docker-compose.yml`
+- `data/script/realdata.sql`
