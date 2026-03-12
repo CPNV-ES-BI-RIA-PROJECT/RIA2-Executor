@@ -46,7 +46,7 @@ The code currently relies on `.env` values being loaded into JVM system properti
 ### Required variables actually used by the code
 
 ```bash
-SEREVER_PORT=8090
+SERVER_PORT=8090
 PROVIDER_IMPL=AWS
 
 AWS_REGION=your-region
