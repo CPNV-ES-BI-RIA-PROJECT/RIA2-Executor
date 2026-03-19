@@ -1,5 +1,20 @@
 # RIA2 Executor
 
+## For OPS !
+Do not implement the RIA2-SQL-Bridge in the data warehouse yet. You can retrieve the SQL script by performing a
+curl request on the bucket adapter:
+```bash
+curl http://<DOMAIN-BUCKET-ADAPTER>:8081/api/v1/objects/download?remote=<YOUR-BUCKET-NAME/FOLDER/FILE.SQL>
+```
+
+`<DOMAIN-BUCKET-ADAPTER>` => Name of the domain where the bucket is hosted.
+`<YOUR-BUCKET-NAME/FOLDER/FILE.SQL>` => Path of the file to download.
+
+For now, manually execute the INSERT returned by the download.
+
+> I work as fast as possible, but as slowly as necessary ;)
+
+
 ## Overview
 
 This project is a Spring Boot service that combines two responsibilities:
@@ -39,33 +54,6 @@ Copy the example file first:
 
 ```bash
 cp .env.exemple .env
-```
-
-The code currently relies on `.env` values being loaded into JVM system properties by `DotenvInitializer`. For local development, keep `.env` in the project root.
-
-### Required variables actually used by the code
-
-```bash
-SERVER_PORT=8090
-PROVIDER_IMPL=AWS
-
-AWS_REGION=your-region
-AWS_ACCESS_KEY_ID=your-access-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-access-key
-
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_APPLICATION_CREDENTIALS=/absolute/or/project-relative/path-to-credentials.json
-
-MARIADB_VERSION=11.4
-MARIADB_PORT=3306
-MARIADB_ROOT_PASSWORD=root
-MARIADB_DATABASE=executor
-MARIADB_USER=executor
-MARIADB_PASSWORD=executor_pwd
-
-spring.datasource.url=jdbc:mariadb://localhost:3306/executor
-spring.datasource.username=executor
-spring.datasource.password=executor_pwd
 ```
 
 ### Important current behavior
@@ -115,43 +103,7 @@ The most reliable workflow with the current code is:
 Start only MariaDB:
 
 ```bash
-docker compose up -d mariadb
-```
-
-Run the application:
-
-```bash
-./mvnw spring-boot:run
-```
-
-Open Swagger:
-
-```text
-http://localhost:8090/api/swagger-ui/index.html
-```
-
-### Full Docker Compose
-
-The repository also contains an `app` service in `docker-compose.yml`:
-
-```bash
-docker compose up --build
-```
-
-However, the current Java configuration loads provider credentials from JVM system properties populated by `.env`. If you run the app inside Docker, make sure those properties are still available to the JVM inside the container; otherwise AWS/GCP client initialization can fail.
-
-## Build and Test
-
-Build:
-
-```bash
-./mvnw clean install
-```
-
-Run tests:
-
-```bash
-./mvnw test
+docker compose up --build -d app
 ```
 
 ## API Endpoints
@@ -160,14 +112,6 @@ Run tests:
 
 Base: `/api/v1/objects`
 
-- `GET /api/v1/objects?remote=<bucket-or-prefix>&recursive=<true|false>`
-  Lists bucket contents.
-- `POST /api/v1/objects?remote=<bucket/key.sql>`
-  Uploads a file as `multipart/form-data` using the `file` part.
-- `DELETE /api/v1/objects?remote=<bucket/key-or-prefix>&recursive=<true|false>`
-  Deletes a file or a prefix.
-- `GET /api/v1/objects/share?remote=<bucket/key>&expirationTime=<seconds>`
-  Returns a temporary URL.
 - `GET /api/v1/objects/download?remote=<bucket/key.sql>`
   Downloads the remote object and saves it locally. The response body is:
 
@@ -197,23 +141,16 @@ HTTP 200 with a plain-text success message
 
 ## Example End-to-End Usage
 
-### 1. Upload a SQL file to the selected bucket
+### 1. Download it locally through the API
 
 ```bash
-curl -X POST "http://localhost:8090/api/v1/objects?remote=my-bucket/sql/realdata.sql" \
-  -F "file=@data/script/realdata.sql"
+curl "http://localhost:8082/api/v1/objects/download?remote=my-bucket/folder/file.sql"
 ```
 
-### 2. Download it locally through the API
+### 2. Execute the saved script
 
 ```bash
-curl "http://localhost:8090/api/v1/objects/download?remote=my-bucket/sql/realdata.sql"
-```
-
-### 3. Execute the saved script
-
-```bash
-curl -X POST "http://localhost:8090/api/v1/execute-script?localPath=data/script/realdata.sql"
+curl -X POST "http://localhost:8082/api/v1/execute-script?localPath=local/path/file.sql"
 ```
 
 You can also execute any existing local SQL file directly, as long as the path is accessible by the running application.
@@ -234,3 +171,18 @@ You can also execute any existing local SQL file directly, as long as the path i
 - `src/main/resources/application.properties`
 - `docker-compose.yml`
 - `data/script/realdata.sql`
+
+## DEV ZONE
+### Build and Test
+
+Build:
+
+```bash
+./mvnw clean install
+```
+
+Run tests:
+
+```bash
+./mvnw test
+```
