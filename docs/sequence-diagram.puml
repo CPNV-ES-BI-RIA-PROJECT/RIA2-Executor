@@ -1,44 +1,26 @@
 @startuml
-title GET /api/v1/objects (Async, REST, DI)
+title POST /api/v1/importRemoteSql (Success case)
 
 actor ApiUser
-participant Router
-participant Controller
-participant BucketService
-participant BucketAdapterFactory
-participant "AWSBucketAdapterImpl" as AWSAdapter
-participant "AWSClient\n(AWS SDK)" as AWSClient
+participant SqlBridgeController
+participant SqlBridgeService
+participant UrlDownloadService
+participant SqlFileStorageService
 
 == 1. HTTP Request ==
-ApiUser -> Router: 1. GET /api/aws/objects?remoteSrc=
-Router -> Controller: 2. route(request)
+ApiUser -> SqlBridgeController: POST /api/v1/importRemoteSql {"url":"share-file.com"}
 
-== 3. Controller ==
-Controller ->> BucketService: 3. list(remoteSrc)
+== 2. Import remote SQL ==
+SqlBridgeController -> SqlBridgeService: importFromUrl(url)
+SqlBridgeService -> UrlDownloadService: fetch(url)
+UrlDownloadService -> UrlDownloadService: validateUrl(url)
+UrlDownloadService --> SqlBridgeService: DownloadedObject(bytes, contentType, fileName)
 
-== 4. Service ==
-BucketService -> BucketAdapterFactory: 4. getBucketAdapter()
-BucketAdapterFactory --> BucketService: AWSBucketAdapterImpl
+SqlBridgeService -> SqlFileStorageService: store(bytes, fileName, contentType)
+SqlFileStorageService --> SqlBridgeService: StoredFile(path, fileName, size)
 
-BucketService ->> AWSAdapter: 4. list(remoteSrc)
-
-== 4.1 Dependency Injection ==
-note over AWSAdapter
-AWSClient is injected
-(via constructor or setter),
-not instantiated directly
-end note
-
-AWSAdapter -> AWSClient: (injected dependency)
-
-== 5. Async SDK Call ==
-AWSAdapter ->> AWSClient: 5. list(remoteSrc)
-AWSClient -->> AWSAdapter: AWSObjects<objectNames[]>
-
-AWSAdapter -->> BucketService: objectNames[]
-BucketService -->> Controller: objectNames[]
-
-== REST Response ==
-Controller -->> ApiUser: HTTP 200 OK\n[objectNames[]]
+== 3. Response ==
+SqlBridgeService --> SqlBridgeController: ImportResult(path, fileName, size, status)
+SqlBridgeController --> ApiUser: 201 Created + ImportResponse(...)
 
 @enduml

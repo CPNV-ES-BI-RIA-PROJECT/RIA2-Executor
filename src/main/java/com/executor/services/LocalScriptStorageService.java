@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.stereotype.Service;
 
@@ -12,10 +14,16 @@ public class LocalScriptStorageService {
 
     private static final Path SCRIPT_DIRECTORY = Paths.get("data", "script");
 
-    public Path save(String remote, byte[] data) throws IOException {
+    public Path save( byte[] data) throws IOException {
         Files.createDirectories(SCRIPT_DIRECTORY);
 
-        String filename = extractFilename(remote);
+        // Formatter : yyyyMMdd_HHmmss → 20260324_153045
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+
+        String timestamp = LocalDateTime.now().format(formatter);
+
+        String filename = timestamp + ".sql";
+
         Path target = SCRIPT_DIRECTORY.resolve(filename).normalize();
 
         if (!target.startsWith(SCRIPT_DIRECTORY)) {
@@ -25,24 +33,5 @@ public class LocalScriptStorageService {
         Files.write(target, data);
 
         return target;
-    }
-
-    private String extractFilename(String remote) {
-        String raw = remote.substring(remote.lastIndexOf('/') + 1);
-
-        if (raw.isBlank()) {
-            throw new IllegalArgumentException("Filename is missing in remote path");
-        }
-
-        String sanitized = raw.replace("\\", "_")
-                .replace("/", "_")
-                .replace("..", "_")
-                .replace("\"", "");
-
-        if (!sanitized.endsWith(".sql")) {
-            sanitized = sanitized + ".sql";
-        }
-
-        return sanitized;
     }
 }

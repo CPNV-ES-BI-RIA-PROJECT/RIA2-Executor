@@ -1,28 +1,9 @@
-# RIA2 Executor
-
-## For OPS !
-Do not implement the RIA2-SQL-Bridge in the data warehouse yet. You can retrieve the SQL script by performing a
-curl request on the bucket adapter:
-```bash
-curl http://<DOMAIN-BUCKET-ADAPTER>:8081/api/v1/objects/download?remote=<YOUR-BUCKET-NAME/FOLDER/FILE.SQL>
-```
-
-`<DOMAIN-BUCKET-ADAPTER>` => Name of the domain where the bucket is hosted.
-`<YOUR-BUCKET-NAME/FOLDER/FILE.SQL>` => Path of the file to download.
-
-For now, manually execute the INSERT returned by the download.
-
-> I work as fast as possible, but as slowly as necessary ;)
-
+# RIA2 SQL-Bridge
 
 ## Overview
 
-This project is a Spring Boot service that combines two responsibilities:
+This project is a Spring Boot service that executes SQL scripts against MariaDB after downloading them locally.
 
-1. Object storage access through a provider adapter (`AWS` or `GCP` today).
-2. SQL script execution against MariaDB after the script has been downloaded locally.
-
-The current codebase is not just a bucket adapter anymore. The main workflow implemented in the code is:
 
 1. Retrieve a `.sql` file from a cloud bucket.
 2. Save the downloaded file under `data/script/`.
@@ -30,9 +11,6 @@ The current codebase is not just a bucket adapter anymore. The main workflow imp
 
 Base path: `/api`  
 API version prefix: `/v1`
-
-Swagger UI: `http://localhost:<port>/api/swagger-ui/index.html`
-
 
 ## Tech Stack
 
@@ -56,20 +34,11 @@ Copy the example file first:
 cp .env.exemple .env
 ```
 
-### Important current behavior
-
-- `PROVIDER_IMPL` selects the adapter used by `BucketAdapterFactory`.
-- Remote bucket paths are expected in the form `bucket/key.sql` or `gs://bucket/key.sql`.
-- Downloaded scripts are saved under `data/script/`.
-- The saved file name is sanitized, and `.sql` is appended automatically if missing.
-- `AwsClientConfig` and `GcpStorageConfig` currently read JVM system properties, so the current implementation expects `.env` loading semantics instead of plain environment-variable lookup.
-- `AZURE` exists as a bean name, but the implementation is empty.
-
 ## Database Initialization
 
 If this is the first time the database is run, create the `events` table before executing the sample insert script:
 
-```sql
+```sql 
 CREATE TABLE events (
     uid VARCHAR(255) NOT NULL PRIMARY KEY,
     dtstamp DATETIME,
@@ -87,7 +56,7 @@ CREATE TABLE events (
 
 The sample file already present in the repository is:
 
-- `data/script/realdata.sql`
+- `data/script/TIMESTAMP_OF_DOWLOAD.sql`
 
 It inserts one row into `events`.
 
@@ -95,34 +64,35 @@ It inserts one row into `events`.
 
 ### Recommended local workflow
 
-The most reliable workflow with the current code is:
-
-1. Start MariaDB with Docker Compose.
-2. Run the Spring Boot app locally with Maven so `.env` is loaded by `DotenvInitializer`.
-
-Start only MariaDB:
+Start only App:
 
 ```bash
 docker compose up --build -d app
 ```
-
 ## API Endpoints
 
 ### Object storage endpoints
 
 Base: `/api/v1/objects`
 
-- `GET /api/v1/objects/download?remote=<bucket/key.sql>`
-  Downloads the remote object and saves it locally. The response body is:
+- `POST /api/v1/objects/import`
+  Downloads a file from a shared HTTP(S) URL and stores it locally. The request body is:
 
 ```json
 {
-  "remote": "bucket/path/script.sql",
-  "filename": "script.sql",
-  "localPath": "data/script/script.sql"
+  "url": "https://example.com/FILE_SHARED_BY_ORCHESTRATOR"
 }
 ```
 
+  The response body is:
+
+```json
+{
+  "path": "data/script/TIMESTAMP_OF_DOWNLOAD.sql"
+}
+```
+
+@TODO REFACTOR THIS AFTER THE REFACTOR OF EXECUTION
 ### SQL execution endpoint
 
 - `POST /api/v1/execute-script?localPath=<path-to-local-sql-file>`
@@ -130,7 +100,7 @@ Base: `/api/v1/objects`
 Example:
 
 ```bash
-curl -X POST "http://localhost:8090/api/v1/execute-script?localPath=data/script/realdata.sql"
+curl -X POST "http://localhost:8082/api/v1/execute-script?localPath=data/script/realdata.sql"
 ```
 
 Current success response:
@@ -141,12 +111,15 @@ HTTP 200 with a plain-text success message
 
 ## Example End-to-End Usage
 
-### 1. Download it locally through the API
+### 1. Import a SQL file from a shared URL
 
 ```bash
-curl "http://localhost:8082/api/v1/objects/download?remote=my-bucket/folder/file.sql"
+curl -X POST "http://localhost:8082/api/v1/objects/import" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/file.sql"}'
 ```
 
+@TODO REFACTOR THIS AFTER THE REFACTOR OF EXECUTION
 ### 2. Execute the saved script
 
 ```bash
@@ -155,34 +128,4 @@ curl -X POST "http://localhost:8082/api/v1/execute-script?localPath=local/path/f
 
 You can also execute any existing local SQL file directly, as long as the path is accessible by the running application.
 
-## Notes About the Current Codebase
-
-- The Maven artifact and some OpenAPI labels still use the old `bucket-adapter` naming.
-- The application name in `application.properties` is still `bucket-adapter`.
-- The README here reflects the actual code behavior, not the older project wording.
-- Tests currently cover the AWS and GCP adapter implementations only.
-
-## Useful Files
-
-- `src/main/java/com/executor/controllers/BucketController.java`
-- `src/main/java/com/executor/controllers/SqlScriptExecutorController.java`
-- `src/main/java/com/executor/services/SqlExecutorService.java`
-- `src/main/java/com/executor/services/LocalScriptStorageService.java`
-- `src/main/resources/application.properties`
-- `docker-compose.yml`
-- `data/script/realdata.sql`
-
-## DEV ZONE
-### Build and Test
-
-Build:
-
-```bash
-./mvnw clean install
-```
-
-Run tests:
-
-```bash
-./mvnw test
-```
+The examples above assume `SERVER_PORT=8082`. If your `.env` uses another port, replace `8082` accordingly.
