@@ -10,11 +10,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.Path;
 
+@RestController
+@RequestMapping("/v1/objects")
 public class SqlBridgeController {
 
     private final UrlDownloadService urlDownloadService;
@@ -39,10 +43,14 @@ public class SqlBridgeController {
             @ApiResponse(responseCode = "400", description = "Invalid URL"),
             @ApiResponse(responseCode = "500", description = "Internal error")
     })
-    @PostMapping(value = "/import", consumes = MediaType.APPLICATION_JSON_VALUE, params = "remote")
+    @PostMapping(value = "/import", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public ImportResult importFromUrl(@RequestBody ImportFromUrlRequest body) {
         try {
+            if (body == null || body.url() == null || body.url().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must contain a non-empty url");
+            }
+
             var downloaded = urlDownloadService.fetch(body.url());
 
             Path savedPath = localScriptStorageService.save(downloaded.bytes());
