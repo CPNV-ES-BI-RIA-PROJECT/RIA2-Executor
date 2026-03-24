@@ -1,143 +1,153 @@
-# RIA2 SQL-Bridge
+# RIA2 Executor
 
 ## Overview
 
-This project is a Spring Boot service that executes SQL scripts against MariaDB after downloading them locally.
+This project is a Spring Boot service that:
 
+1. downloads a SQL file from an HTTP(S) URL,
+2. stores it under `data/script/`,
+3. executes queued `.sql` files against a MariaDB database,
+4. deletes each script immediately after a successful execution.
 
-1. Retrieve a `.sql` file from a cloud bucket.
-2. Save the downloaded file under `data/script/`.
-3. Execute that local SQL file against the configured MariaDB datasource.
+The application runs under the `/api` context path, so the current HTTP API lives under `/api/v1`.
 
-Base path: `/api`  
-API version prefix: `/v1`
+## Current API
 
-## Tech Stack
+### Import a SQL file
+
+`POST /api/v1/objects/import`
+
+Request body:
+
+```json
+{
+  "url": "https://example.com/file.sql"
+}
+```
+
+Success response:
+
+```json
+{
+  "path": "data/script/20260324_153045.sql"
+}
+```
+
+Notes:
+
+- Only `http` and `https` URLs are accepted.
+- Local/private addresses are rejected.
+- Downloads are limited to 50 MB.
+- The endpoint returns `201 Created` on success.
+
+### Execute all queued SQL scripts
+
+`POST /api/v1/execute-scripts`
+
+Success response:
+
+```text
+Scripts SQL exécutés avec succès
+```
+
+Execution behavior:
+
+- Only `.sql` files from `data/script/` are executed.
+- Files are processed in sorted order.
+- Each file is deleted right after a successful execution.
+- If one script fails, the failing script and the remaining scripts stay on disk.
+- Symbolic links are rejected.
+
+## Stack
 
 - Java 21
-- Spring Boot 4
+- Spring Boot 4.0.1
 - Spring Web MVC
 - Spring JDBC
 - MariaDB JDBC driver
-- AWS SDK v2 for S3
-- Google Cloud Storage SDK
-- Springdoc OpenAPI
+- springdoc OpenAPI
 - JUnit 5
 - Mockito
 - Docker / Docker Compose
 
 ## Configuration
 
-Copy the example file first:
+The application loads variables from `.env` before Spring starts.
+
+Start from the example file:
 
 ```bash
 cp .env.exemple .env
 ```
 
-## Database Initialization
+Core application variables:
 
-If this is the first time the database is run, create the `events` table before executing the sample insert script:
+| Variable | Purpose |
+| --- | --- |
+| `SERVER_PORT` | HTTP port used by the Spring application |
+| `DB_DRIVER` | JDBC driver prefix, default is `mariadb` |
+| `DB_HOST` | MariaDB host |
+| `DB_PORT` | MariaDB port |
+| `DB_DATABASE` | Database name |
+| `DB_USER` | Database user |
+| `DB_PASSWORD` | Database password |
 
-```sql 
-CREATE TABLE events (
-    uid VARCHAR(255) NOT NULL PRIMARY KEY,
-    dtstamp DATETIME,
-    dtstart DATETIME,
-    dtend DATETIME,
-    summary TEXT,
-    description TEXT,
-    categories TEXT,
-    organizer VARCHAR(255),
-    attendee TEXT,
-    location TEXT,
-    timezone VARCHAR(64)
-);
-```
+Additional variables used by `docker-compose.yml`:
 
-The sample file already present in the repository is:
+| Variable | Purpose |
+| --- | --- |
+| `DB_ROOT_PASSWORD` | MariaDB root password |
+| `DB_VERSION` | MariaDB image tag |
+| `DB_EXPOSED_PORT` | Host port mapped to the MariaDB container |
 
-- `data/script/TIMESTAMP_OF_DOWLOAD.sql`
+The JDBC URL is built from these values in `application.properties`.
 
-It inserts one row into `events`.
+## Running Locally
 
-## Running the Project
+### Docker Compose
 
-### Recommended local workflow
-
-Start only App:
+Make sure `.env` also defines `DB_VERSION`, `DB_EXPOSED_PORT`, and a database host reachable by the app container. For the bundled `mariadb` service, that host should be `mariadb`.
 
 ```bash
-docker compose up --build -d app
-```
-## API Endpoints
-
-### Object storage endpoints
-
-Base: `/api/v1/objects`
-
-- `POST /api/v1/objects/import`
-  Downloads a file from a shared HTTP(S) URL and stores it locally. The request body is:
-
-```json
-{
-  "url": "https://example.com/FILE_SHARED_BY_ORCHESTRATOR"
-}
+docker compose up --build app
 ```
 
-  The response body is:
+Useful services:
 
-```json
-{
-  "path": "data/script/TIMESTAMP_OF_DOWNLOAD.sql"
-}
-```
+- `app`: Spring Boot application
 
-### SQL execution endpoint
+The compose setup mounts:
 
-- `POST /api/v1/execute-script?localPath=<path-to-local-sql-file>`
+- `./data` to persist downloaded SQL files
 
-Example:
+## Example Usage
 
-```bash
-curl -X POST "http://localhost:8082/api/v1/execute-script?localPath=data/script/realdata.sql"
-```
-
-Current success response:
-
-```text
-HTTP 200 with a plain-text success message
-```
-
-### Batch SQL execution endpoint
-
-- `POST /api/v1/execute-scripts`
-
-Executes every `.sql` file currently present in `data/script`, in sorted order. Each file is
-deleted immediately after its successful execution. If one script fails, the failing file and any
-remaining files stay on disk.
-
-## Example End-to-End Usage
-
-### 1. Import a SQL file from a shared URL
+Import a SQL file:
 
 ```bash
 curl -X POST "http://localhost:8082/api/v1/objects/import" \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com/file.sql"}'
+  -d '{"url":"https://URL_GIVEN_BY_ORCHESTRATOR"}'
 ```
 
-### 2. Execute the saved script
-
-```bash
-curl -X POST "http://localhost:8082/api/v1/execute-script?localPath=local/path/file.sql"
-```
-
-You can also execute any existing local SQL file directly, as long as the path is accessible by the running application.
-
-### 3. Execute every queued script
+Execute every queued script:
 
 ```bash
 curl -X POST "http://localhost:8082/api/v1/execute-scripts"
 ```
 
-The examples above assume `SERVER_PORT=8082`. If your `.env` uses another port, replace `8082` accordingly.
+If your `.env` uses a different `SERVER_PORT`, replace `8082` in the examples.
+
+## Tests
+
+Run the test suite with:
+
+```bash
+./mvnw test
+```
+
+## Notes
+
+- Downloaded scripts are timestamp-based, for example `20260324_153045.sql`.
+- The local script directory defaults to `data/script`.
+- There is currently no HTTP endpoint for executing a single specific SQL file.
