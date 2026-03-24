@@ -92,7 +92,6 @@ Base: `/api/v1/objects`
 }
 ```
 
-@TODO REFACTOR THIS AFTER THE REFACTOR OF EXECUTION
 ### SQL execution endpoint
 
 - `POST /api/v1/execute-script?localPath=<path-to-local-sql-file>`
@@ -109,6 +108,14 @@ Current success response:
 HTTP 200 with a plain-text success message
 ```
 
+### Batch SQL execution endpoint
+
+- `POST /api/v1/execute-scripts`
+
+Executes every `.sql` file currently present in `data/script`, in sorted order. Each file is
+deleted immediately after its successful execution. If one script fails, the failing file and any
+remaining files stay on disk.
+
 ## Example End-to-End Usage
 
 ### 1. Import a SQL file from a shared URL
@@ -119,7 +126,6 @@ curl -X POST "http://localhost:8082/api/v1/objects/import" \
   -d '{"url":"https://example.com/file.sql"}'
 ```
 
-@TODO REFACTOR THIS AFTER THE REFACTOR OF EXECUTION
 ### 2. Execute the saved script
 
 ```bash
@@ -127,5 +133,11 @@ curl -X POST "http://localhost:8082/api/v1/execute-script?localPath=local/path/f
 ```
 
 You can also execute any existing local SQL file directly, as long as the path is accessible by the running application.
+
+### 3. Execute every queued script
+
+```bash
+curl -X POST "http://localhost:8082/api/v1/execute-scripts"
+```
 
 The examples above assume `SERVER_PORT=8082`. If your `.env` uses another port, replace `8082` accordingly.
