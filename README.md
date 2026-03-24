@@ -14,7 +14,6 @@ For now, manually execute the INSERT returned by the download.
 
 > I work as fast as possible, but as slowly as necessary ;)
 
-
 ## Overview
 
 This project is a Spring Boot service that combines two responsibilities:
