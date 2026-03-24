@@ -4,7 +4,6 @@ import com.executor.services.SqlExecutorService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -17,9 +16,9 @@ public class SqlScriptExecutorController {
         this.sqlExecutorService = sqlExecutorService;
     }
 
-    @PostMapping(value = "/execute-script", params = "localPath")
-    public ResponseEntity<String> executeScript(@RequestParam String localPath) {
-        sqlExecutorService.executeScript(localPath);
-        return ResponseEntity.ok("Script SQL exécuté avec succès");
+    @PostMapping(value = "/execute-scripts")
+    public ResponseEntity<String> executeAllScripts() {
+        sqlExecutorService.executeAllScripts();
+        return ResponseEntity.ok("Scripts SQL exécutés avec succès");
     }
 }
