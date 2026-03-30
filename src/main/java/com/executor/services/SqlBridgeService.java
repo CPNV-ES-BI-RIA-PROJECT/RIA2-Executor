@@ -17,17 +17,19 @@ import org.springframework.stereotype.Service;
 public class SqlBridgeService {
 
     private final ExecutionHistoryRepository executionHistoryRepository;
-    private final S3PublicFileService s3PublicFileService;
     private final SqlExecutorService sqlExecutorService;
+    private final BucketSqlBridgeClient bucketSqlBridgeClient;
+
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(SqlBridgeService.class);
 
     public SqlBridgeService(
             ExecutionHistoryRepository executionHistoryRepository,
-            S3PublicFileService s3PublicFileService,
-            SqlExecutorService sqlExecutorService
+            SqlExecutorService sqlExecutorService, BucketSqlBridgeClient bucketSqlBridgeClient
     ) {
         this.executionHistoryRepository = executionHistoryRepository;
-        this.s3PublicFileService = s3PublicFileService;
         this.sqlExecutorService = sqlExecutorService;
+        this.bucketSqlBridgeClient = bucketSqlBridgeClient;
     }
 
     public ExecutedFile runAllRecentFiles() throws IOException {
@@ -36,7 +38,7 @@ public class SqlBridgeService {
         String timestamp = executionHistoryRepository.getLastTimestamp();
         LocalDateTime lastTimestamp = parseLastTimestamp(timestamp, fileFormatter);
 
-        List<RemoteFileDto> recentFiles = s3PublicFileService.list().stream()
+        List<RemoteFileDto> recentFiles = bucketSqlBridgeClient.list().stream()
                 .filter(file -> isRecentSqlFile(file, lastTimestamp, fileFormatter))
                 .sorted(Comparator.comparing(file -> extractTimestamp(file.getFileName(), fileFormatter)))
                 .toList();
@@ -44,15 +46,22 @@ public class SqlBridgeService {
         int filesGet = recentFiles.size();
         int filesExecuted = 0;
         List<String> filesNotExecuted = new ArrayList<>();
+        LocalDateTime lastExecutedFileTimestamp = null;
 
         for (RemoteFileDto file : recentFiles) {
             try {
-                DownloadedFileDto download = s3PublicFileService.download(file.getFileName());
+                DownloadedFileDto download = bucketSqlBridgeClient.download(file.getFileName());
                 sqlExecutorService.executeScript(download);
                 filesExecuted++;
+
+                lastExecutedFileTimestamp = extractTimestamp(file.getFileName(), fileFormatter);
             } catch (Exception exception) {
                 filesNotExecuted.add(file.getFileName());
             }
+        }
+
+        if (lastExecutedFileTimestamp != null) {
+            executionHistoryRepository.setLastTimestamp(lastExecutedFileTimestamp.format(fileFormatter));
         }
 
         return new ExecutedFile(
