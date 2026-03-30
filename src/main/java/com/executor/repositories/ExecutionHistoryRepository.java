@@ -5,7 +5,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class ExecutionHistoryRepository {
 
-    private String lastTimestamp = "00000000000";
+    private String lastTimestamp = "19700101_000000";
 
     public String getLastTimestamp() {
         return lastTimestamp;
