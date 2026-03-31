@@ -1,4 +1,4 @@
-# RIA2 Executor
+# RIA2 SQL Bridge
 
 `RIA2 Executor` is a Spring Boot service that fetches recent SQL files from a remote Bucket SQL Bridge, executes them against a MariaDB database, and reports which files were executed successfully.
 
@@ -98,7 +98,7 @@ The repository includes `.env.exemple`, but the variables below are the authorit
 SERVER_PORT=8082
 
 BUCKET_SQL_BRIDGE_URL=http://host.docker.internal:8081
-BUCKET_SQL_BRIDGE_REMOTE=my-bucket/sql/
+BUCKET_SQL_BRIDGE_REMOTE=my-bucket/load/
 
 DB_DRIVER=mariadb
 DB_HOST=localhost
