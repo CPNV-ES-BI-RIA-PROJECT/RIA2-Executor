@@ -156,7 +156,7 @@ Run the same verification phase used in CI:
 ```
 
 ## Bucket Adapter
-For the service to work, you need to run a Bucket Adapter, which is used to communicate with the bucket. Here is the repository link: [HERE](https://github.com/CPNV-ES-BI-RIA-PROJECT/RIA2-bucket-adapter.git)
+For the service to work, you need to run a Bucket Adapter, which is used to communicate with the bucket. Here is the repository link: [HERE](https://github.com/orgs/CPNV-ES-BI-RIA-PROJECT/packages/container/package/ria2-sql-bridge-bucket-adapter)
 
 To start the bucket, please follow the steps in the Bucket Adapter README:
 1. Configuration
