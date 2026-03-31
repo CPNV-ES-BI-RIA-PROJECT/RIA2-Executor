@@ -1,98 +1,90 @@
 # RIA2 Executor
 
-## Overview
+`RIA2 Executor` is a Spring Boot service that fetches recent SQL files from a remote Bucket SQL Bridge, executes them against a MariaDB database, and reports which files were executed successfully.
 
-This project is a Spring Boot service that:
+The application runs under the `/api` context path, so the current HTTP API is exposed under `/api/v1`.
 
-1. downloads a SQL file from an HTTP(S) URL,
-2. stores it under `data/script/`,
-3. executes queued `.sql` files against a MariaDB database,
-4. deletes each script immediately after a successful execution.
+## What It Does
 
-The application runs under the `/api` context path, so the current HTTP API lives under `/api/v1`.
+When you call the execution endpoint, the service:
+
+1. Lists remote files from the configured Bucket SQL Bridge.
+2. Keeps only files ending in `.sql`.
+3. Keeps only files whose name matches the timestamp format `yyyyMMdd_HHmmss.sql`.
+4. Compares those timestamps with the last executed timestamp kept by the application.
+5. Downloads the matching files in chronological order.
+6. Executes each SQL script against the configured MariaDB datasource.
+7. Returns a summary with the number of files found, executed, and skipped due to failure.
 
 ## Current API
 
-### Import a SQL file
+### Execute Recent SQL Files
 
-`POST /api/v1/objects/import`
+`POST /api/v1/objects/recent-files/executions`
 
-Request body:
-
-```json
-{
-  "url": "https://example.com/file.sql"
-}
-```
-
-Success response:
+Response:
 
 ```json
 {
-  "path": "data/script/20260324_153045.sql"
+  "filesGet": 3,
+  "filesExecuted": 2,
+  "filesNotExecuted": [
+    "20260331_081500.sql"
+  ]
 }
 ```
 
 Notes:
 
-- Only `http` and `https` URLs are accepted.
-- Local/private addresses are rejected.
-- Downloads are limited to 50 MB.
-- The endpoint returns `201 Created` on success.
+- There is currently one public endpoint.
+- The endpoint returns `200 OK` with a JSON summary.
+- Files are executed in ascending timestamp order.
+- Only `.sql` files with a valid timestamp-based file name are considered.
+- Invalid names and non-SQL files are ignored.
 
-### Execute all queued SQL scripts
+## Important Behavior
 
-`POST /api/v1/execute-scripts`
+- The execution watermark is stored in memory by `ExecutionHistoryRepository`.
+- Restarting the application resets that watermark to `19700101_000000`.
+- SQL execution stops for a single file if Spring JDBC raises an error, but the batch loop continues with the next remote file.
+- The watermark is updated to the latest successfully executed file in the batch.
+- Because the watermark is a single timestamp, an older failed file can be skipped on a later run if a newer file succeeded in the same batch.
 
-Success response:
-
-```text
-Scripts SQL exécutés avec succès
-```
-
-Execution behavior:
-
-- Only `.sql` files from `data/script/` are executed.
-- Files are processed in sorted order.
-- Each file is deleted right after a successful execution.
-- If one script fails, the failing script and the remaining scripts stay on disk.
-- Symbolic links are rejected.
-
-## Stack
+## Project Stack
 
 - Java 21
 - Spring Boot 4.0.1
 - Spring Web MVC
 - Spring JDBC
-- MariaDB JDBC driver
+- MariaDB JDBC Driver
 - springdoc OpenAPI
 - JUnit 5
 - Mockito
+- Checkstyle
+- SpotBugs
 - Docker / Docker Compose
 
 ## Configuration
 
-The application loads variables from `.env` before Spring starts.
+The application loads `.env` before Spring starts.
 
-Start from the example file:
+The repository includes `.env.exemple`, but the variables below are the authoritative list for the current implementation.
 
-```bash
-cp .env.exemple .env
-```
-
-Core application variables:
+### Required Application Variables
 
 | Variable | Purpose |
 | --- | --- |
-| `SERVER_PORT` | HTTP port used by the Spring application |
-| `DB_DRIVER` | JDBC driver prefix, default is `mariadb` |
+| `SERVER_PORT` | HTTP port used by the Spring Boot application |
+| `BUCKET_SQL_BRIDGE_URL` | Base URL of the Bucket SQL Bridge service |
+| `BUCKET_SQL_BRIDGE_REMOTE` | Remote folder/path queried on the bridge |
+| `DB_DRIVER` | JDBC driver prefix, default `mariadb` |
 | `DB_HOST` | MariaDB host |
 | `DB_PORT` | MariaDB port |
 | `DB_DATABASE` | Database name |
 | `DB_USER` | Database user |
 | `DB_PASSWORD` | Database password |
 
-Additional variables used by `docker-compose.yml`:
+### Additional Variables For `docker-compose.yml`
 
 | Variable | Purpose |
 | --- | --- |
@@ -100,54 +92,74 @@ Additional variables used by `docker-compose.yml`:
 | `DB_VERSION` | MariaDB image tag |
 | `DB_EXPOSED_PORT` | Host port mapped to the MariaDB container |
 
-The JDBC URL is built from these values in `application.properties`.
+### Example `.env`
 
-## Running Locally
+```dotenv
+SERVER_PORT=8082
 
-### Docker Compose
+BUCKET_SQL_BRIDGE_URL=http://host.docker.internal:8081
+BUCKET_SQL_BRIDGE_REMOTE=my-bucket/sql/
 
-Make sure `.env` also defines `DB_VERSION`, `DB_EXPOSED_PORT`, and a database host reachable by the app container. For the bundled `mariadb` service, that host should be `mariadb`.
+DB_DRIVER=mariadb
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=executor
+DB_USER=executor
+DB_PASSWORD=executor_pwd
 
-```bash
-docker compose up --build app
+DB_ROOT_PASSWORD=root
+DB_VERSION=11.7
+DB_EXPOSED_PORT=3306
 ```
 
-Useful services:
+### With Docker Compose
 
-- `app`: Spring Boot application
+The compose file starts:
 
-The compose setup mounts:
+- `app`
 
-- `./data` to persist downloaded SQL files
-
-## Example Usage
-
-Import a SQL file:
+Run:
 
 ```bash
-curl -X POST "http://localhost:8082/api/v1/objects/import" \
-  -H "Content-Type: application/json" \
-  -d '{"url":"https://URL_GIVEN_BY_ORCHESTRATOR"}'
+docker compose up --build
 ```
 
-Execute every queued script:
+The app will be available on `http://localhost:${SERVER_PORT}/api`.
+
+## Example Request
 
 ```bash
-curl -X POST "http://localhost:8082/api/v1/execute-scripts"
+curl -X POST "http://localhost:8082/api/v1/objects/recent-files/executions"
 ```
 
-If your `.env` uses a different `SERVER_PORT`, replace `8082` in the examples.
+If your `.env` uses another `SERVER_PORT`, replace `8082` accordingly.
 
-## Tests
+## OpenAPI
 
-Run the test suite with:
+When the application is running, Springdoc exposes:
+
+- Swagger UI: `http://localhost:${SERVER_PORT}/api/swagger-ui/index.html`
+- OpenAPI JSON: `http://localhost:${SERVER_PORT}/api/v3/api-docs`
+
+## Development
+
+Run the test suite:
 
 ```bash
 ./mvnw test
 ```
 
-## Notes
+Run the same verification phase used in CI:
 
-- Downloaded scripts are timestamp-based, for example `20260324_153045.sql`.
-- The local script directory defaults to `data/script`.
-- There is currently no HTTP endpoint for executing a single specific SQL file.
+```bash
+./mvnw clean verify
+```
+
+## Bucket Adapter
+For the service to work, you need to run a Bucket Adapter, which is used to communicate with the bucket. Here is the repository link: [HERE](https://github.com/CPNV-ES-BI-RIA-PROJECT/RIA2-bucket-adapter.git)
+
+To start the bucket, please follow the steps in the Bucket Adapter README:
+1. Configuration
+2. Docker build & run
+
+If you need help, the magnificent author of these lines can be found behind the yellow door.
