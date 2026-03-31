@@ -1,19 +1,20 @@
 package com.executor.services;
 
+import com.executor.dto.DownloadedFileDto;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.stereotype.Service;
+
+import javax.sql.DataSource;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-
-import javax.sql.DataSource;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
-import org.springframework.stereotype.Service;
 
 @Service
 public class SqlExecutorService {
@@ -23,15 +24,14 @@ public class SqlExecutorService {
 
     public SqlExecutorService(
             DataSource dataSource,
-            @Value("${sql.script.directory:data/script}") String scriptDirectory) {
+            @org.springframework.beans.factory.annotation.Value("${sql.script.directory:data/script}") String scriptDirectory) {
         this.dataSource = dataSource;
         this.scriptDirectory = Path.of(scriptDirectory).toAbsolutePath().normalize();
     }
 
-    public void executeScript(String localPath) {
-        Path scriptPath = resolveScriptPath(localPath);
-        executeScriptFile(scriptPath);
-        deleteScriptFile(scriptPath);
+    public void executeScript(DownloadedFileDto download) {
+        validateDownloadedScript(download);
+        executeDownloadedScript(download);
     }
 
     public void executeAllScripts() {
@@ -75,32 +75,46 @@ public class SqlExecutorService {
         }
     }
 
-    private Path resolveScriptPath(String localPath) {
-        Path providedPath = Path.of(localPath).toAbsolutePath().normalize();
-
-        if (!providedPath.startsWith(scriptDirectory)) {
-            throw new IllegalArgumentException("SQL script must stay under " + scriptDirectory);
+    private void validateDownloadedScript(DownloadedFileDto download) {
+        if (download == null) {
+            throw new IllegalArgumentException("Downloaded script must not be null");
         }
 
-        if (Files.isSymbolicLink(providedPath)) {
-            throw new IllegalArgumentException("Symbolic links are not allowed: " + providedPath);
+        if (download.getFileName() == null || download.getFileName().isBlank()) {
+            throw new IllegalArgumentException("Downloaded script fileName is required");
         }
 
-        if (!Files.isRegularFile(providedPath, LinkOption.NOFOLLOW_LINKS)) {
-            throw new IllegalArgumentException("Invalid SQL script file: " + providedPath);
+        if (!isSqlFileName(download.getFileName())) {
+            throw new IllegalArgumentException("Only .sql files are allowed: " + download.getFileName());
         }
 
-        if (!isSqlFile(providedPath)) {
-            throw new IllegalArgumentException("Only .sql files are allowed: " + providedPath);
+        if (download.getContent() == null || download.getContent().isBlank()) {
+            throw new IllegalArgumentException("Downloaded script content must not be empty");
         }
-
-        return providedPath;
     }
 
     private boolean isSqlFile(Path path) {
-        String filename = String.valueOf(path.getFileName());
-        return filename.length() >= 4
-                && filename.regionMatches(true, filename.length() - 4, ".sql", 0, 4);
+        return isSqlFileName(String.valueOf(path.getFileName()));
+    }
+
+    private boolean isSqlFileName(String fileName) {
+        return fileName.length() >= 4
+                && fileName.regionMatches(true, fileName.length() - 4, ".sql", 0, 4);
+    }
+
+    private void executeDownloadedScript(DownloadedFileDto download) {
+        ByteArrayResource resource = new ByteArrayResource(
+                download.getContent().getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return download.getFileName();
+            }
+        };
+
+        ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
+        populator.addScript(resource);
+        populator.setContinueOnError(false);
+        populator.execute(dataSource);
     }
 
     private void executeScriptFile(Path scriptPath) {

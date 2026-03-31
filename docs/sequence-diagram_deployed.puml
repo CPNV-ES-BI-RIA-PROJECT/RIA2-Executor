@@ -1,0 +1,31 @@
+@startuml
+title POST /api/v1/recent-files/executions (Success case)
+
+actor CRON
+participant SqlBridgeController
+participant SqlBridgeService
+participant ExecutionHistoryRepository
+participant s3PublicFileService
+participant SqlExecutorService
+
+CRON -> SqlBridgeController: POST /api/v1/recent-files/executions
+
+SqlBridgeController -> SqlBridgeService: runAllRecentFiles()
+SqlBridgeService -> ExecutionHistoryRepository: getLastTimestamp()
+ExecutionHistoryRepository --> SqlBridgeService: lastTimestamp
+
+SqlBridgeService -> s3PublicFileService: list()
+s3PublicFileService --> SqlBridgeService: List<RemoteFileDto>
+
+
+loop for each recent file
+    SqlBridgeService -> s3PublicFileService: download(fileName)
+    s3PublicFileService --> SqlBridgeService: DownloadedFileDto
+    SqlBridgeService -> SqlExecutorService: executeScript(download)
+    SqlExecutorService --> SqlBridgeService: execution success
+end
+
+SqlBridgeService --> SqlBridgeController: ExecutionSummary
+SqlBridgeController --> CRON: 200 OK + ExecutionSummary
+
+@enduml

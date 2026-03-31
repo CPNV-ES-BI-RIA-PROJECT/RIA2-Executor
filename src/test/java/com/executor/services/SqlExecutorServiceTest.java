@@ -1,5 +1,7 @@
 package com.executor.services;
 
+import com.executor.dto.DownloadedFileDto;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,34 +27,25 @@ class SqlExecutorServiceTest {
     Path tempDirectory;
 
     @Test
-    void executeScriptDeletesTargetFileAfterSuccessfulExecution() throws Exception {
-        Path scriptDirectory = Files.createDirectories(tempDirectory.resolve("script"));
-        Path scriptPath = Files.writeString(
-                scriptDirectory.resolve("01-first.sql"),
-                "INSERT INTO sample VALUES (1);");
-
+    void executeScriptRunsDownloadedSqlContentSuccessfully() throws Exception {
         SqlExecutorService service = new SqlExecutorService(
                 mockDataSource(false, false),
-                scriptDirectory.toString());
+                tempDirectory.toString());
 
-        service.executeScript(scriptPath.toString());
-
-        assertFalse(Files.exists(scriptPath));
+        service.executeScript(new DownloadedFileDto(
+                "01-first.sql",
+                "INSERT INTO sample VALUES (1);"));
     }
 
     @Test
-    void executeScriptKeepsFileWhenExecutionFails() throws Exception {
-        Path scriptDirectory = Files.createDirectories(tempDirectory.resolve("script"));
-        Path scriptPath = Files.writeString(
-                scriptDirectory.resolve("01-first.sql"),
-                "INSERT INTO sample VALUES (1);");
-
+    void executeScriptPropagatesFailureWhenExecutionFails() throws Exception {
         SqlExecutorService service = new SqlExecutorService(
                 mockDataSource(true, false),
-                scriptDirectory.toString());
+                tempDirectory.toString());
 
-        assertThrows(RuntimeException.class, () -> service.executeScript(scriptPath.toString()));
-        assertTrue(Files.exists(scriptPath));
+        assertThrows(RuntimeException.class, () -> service.executeScript(new DownloadedFileDto(
+                "01-first.sql",
+                "INSERT INTO sample VALUES (1);")));
     }
 
     @Test
@@ -94,19 +87,16 @@ class SqlExecutorServiceTest {
     }
 
     @Test
-    void executeScriptRejectsPathOutsideScriptDirectory() throws Exception {
-        Path scriptDirectory = Files.createDirectories(tempDirectory.resolve("script"));
-        Path externalScript = Files.writeString(
-                tempDirectory.resolve("outside.sql"),
-                "INSERT INTO sample VALUES (99);");
-
+    void executeScriptRejectsNonSqlFileName() throws Exception {
         SqlExecutorService service = new SqlExecutorService(
                 mockDataSource(false, false),
-                scriptDirectory.toString());
+                tempDirectory.toString());
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.executeScript(externalScript.toString()));
+                () -> service.executeScript(new DownloadedFileDto(
+                        "outside.txt",
+                        "INSERT INTO sample VALUES (99);")));
     }
 
     private DataSource mockDataSource(boolean failFirstStatement, boolean failSecondStatement)
