@@ -68,48 +68,81 @@ Notes:
 
 The application loads `.env` before Spring starts.
 
-The repository includes `.env.exemple`, but the variables below are the authoritative list for the current implementation.
+The repository includes `.env.example`, but the variables below are the authoritative list for the current implementation.
 
 ### Required Application Variables
 
 | Variable | Purpose |
 | --- | --- |
 | `SERVER_PORT` | HTTP port used by the Spring Boot application |
-| `BUCKET_SQL_BRIDGE_URL` | Base URL of the Bucket SQL Bridge service |
-| `BUCKET_SQL_BRIDGE_REMOTE` | Remote folder/path queried on the bridge |
-| `DB_DRIVER` | JDBC driver prefix, default `mariadb` |
-| `DB_HOST` | MariaDB host |
-| `DB_PORT` | MariaDB port |
+| `BUCKET_ADAPTER_SQL_BRIDGE_SERVER_PORT` | HTTP port exposed by the Bucket Adapter service |
+| `BUCKET_SQL_BRIDGE_URL` | Base URL of the Bucket Adapter service reachable from SQL-Bridge |
+| `BUCKET_SQL_BRIDGE_REMOTE` | Remote bucket folder/path queried by SQL-Bridge |
+| `PROVIDER_IMPL` | Cloud provider implementation to use, for example `AWS` |
+| `AWS_REGION` | AWS region used by the Bucket Adapter |
+| `AWS_ACCESS_KEY_ID` | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret access key |
+| `DB_DRIVER` | JDBC driver prefix, for example `mariadb` |
+| `DB_HOST` | Database host |
+| `DB_PORT` | Database port |
 | `DB_DATABASE` | Database name |
 | `DB_USER` | Database user |
 | `DB_PASSWORD` | Database password |
+| `DB_ROOT_PASSWORD` | Database root password |
 
-### Additional Variables For `docker-compose.yml`
+### Notes
 
-| Variable | Purpose |
-| --- | --- |
-| `DB_ROOT_PASSWORD` | MariaDB root password |
-| `DB_VERSION` | MariaDB image tag |
-| `DB_EXPOSED_PORT` | Host port mapped to the MariaDB container |
+- When SQL-Bridge and Bucket Adapter run in the same `docker-compose.yml`, `BUCKET_SQL_BRIDGE_URL` must use the Docker service name, not `localhost` and not `host.docker.internal`.
+- Example:
+    - `http://bucket-adapter-sql-bridge:8084`
+- Replace `BUCKET-NAME/path/of/directory` with the actual bucket and remote directory to read.
+- Do not commit AWS credentials into the repository.
 
 ### Example `.env`
 
 ```dotenv
 SERVER_PORT=8082
+BUCKET_ADAPTER_SQL_BRIDGE_SERVER_PORT=8084
 
-BUCKET_SQL_BRIDGE_URL=http://host.docker.internal:8081
-BUCKET_SQL_BRIDGE_REMOTE=my-bucket/load/
+BUCKET_SQL_BRIDGE_URL=http://bucket-adapter-sql-bridge:8084
+BUCKET_SQL_BRIDGE_REMOTE=BUCKET-NAME/path/of/directory
+
+PROVIDER_IMPL=AWS
+
+AWS_REGION=eu-west-1
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
 
 DB_DRIVER=mariadb
-DB_HOST=localhost
-DB_PORT=3306
-DB_DATABASE=executor
-DB_USER=executor
-DB_PASSWORD=executor_pwd
-
+DB_HOST=name-of-domain
+DB_DATABASE=name-of-database
+DB_USER=root
+DB_PASSWORD=root
 DB_ROOT_PASSWORD=root
-DB_VERSION=11.7
-DB_EXPOSED_PORT=3306
+DB_PORT=3306
+```
+
+### SQL
+Please create the database :
+```sql
+CREATE DATABASE <DB_DATABASE>;
+```
+
+Please create table events :
+```sql
+CREATE TABLE events (
+    uid VARCHAR(255),
+    dtstamp TEXT,
+    dtstart TEXT,
+    dtend TEXT,
+    summary TEXT,
+    description TEXT,
+    categories TEXT,
+    organizer TEXT,
+    attendee TEXT,
+    location TEXT,
+    timezone TEXT
+);
 ```
 
 ### With Docker Compose
