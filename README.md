@@ -131,7 +131,7 @@ CREATE DATABASE <DB_DATABASE>;
 Please create table events :
 ```sql
 CREATE TABLE events (
-    uid VARCHAR(255) NOT NULL PRIMARY KEY,
+    uid VARCHAR(255),
     dtstamp TEXT,
     dtstart TEXT,
     dtend TEXT,
